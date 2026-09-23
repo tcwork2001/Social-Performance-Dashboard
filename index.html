@@ -164,7 +164,8 @@
   .platform-item .p-icon { width: 28px; height: 28px; border-radius: 8px; flex: none; overflow: hidden; }
   .platform-item .p-icon svg { display: block; width: 28px; height: 28px; }
   .platform-item .p-name { flex: 1; }
-  .platform-item .p-check { color: var(--good); font-size: 14px; font-weight: 700; }
+  .platform-item .p-check { color: var(--good); font-size: 14px; font-weight: 700; display: none; }
+  .platform-item.active .p-check { display: inline; }
   .platform-item .soon-badge {
     font-size: 9.5px; font-weight: 700; color: var(--muted); background: var(--page-plane);
     border: 1px solid var(--gridline); border-radius: 20px; padding: 2px 7px; white-space: nowrap;
@@ -483,22 +484,26 @@
       </div>
     </div>
 
-    <!-- Chọn nền tảng: hiện tại chỉ Facebook có dữ liệu thật; Instagram/TikTok/YouTube là chỗ đặt
-         trước cho giao diện, chưa nối API — bấm vào chỉ hiện ghi chú, không đổi dữ liệu đang xem.
+    <!-- Chọn nền tảng: Facebook và Website (Google Analytics) đều có dữ liệu thật, bấm để chuyển
+         hẳn dashboard sang xem nền tảng đó. Instagram/TikTok/YouTube là chỗ đặt trước cho giao diện,
+         chưa nối API — bấm vào chỉ hiện ghi chú, không đổi dữ liệu đang xem.
          Nằm bên phải header, kéo dài hết chiều cao (căn giữa theo cột trái tiêu đề + hàng điều khiển)
          — đúng theo ảnh mẫu người dùng gửi. -->
     <div class="platform-switcher" id="platformSwitcher">
       <button class="platform-btn" id="platformBtn" onclick="togglePlatformMenu(event)">
-        <span class="platform-icon" data-icon="facebook"></span>
-        <span class="platform-name">FACEBOOK</span>
+        <span class="platform-icon" id="platformBtnIcon" data-icon="facebook"></span>
+        <span class="platform-name" id="platformBtnName">FACEBOOK</span>
         <span class="platform-sub-row">
           <span class="platform-sub">Analytics Report</span>
           <span class="platform-chevron">▾</span>
         </span>
       </button>
       <div class="platform-menu" id="platformMenu" hidden>
-        <button class="platform-item active" onclick="selectPlatform('Facebook', true)">
+        <button class="platform-item active" id="platformItemFacebook" onclick="selectPlatform('Facebook', true)">
           <span class="p-icon" data-icon="facebook"></span><span class="p-name">Facebook</span><span class="p-check">✓</span>
+        </button>
+        <button class="platform-item" id="platformItemWebsite" onclick="selectPlatform('Website', true)">
+          <span class="p-icon" data-icon="website"></span><span class="p-name">Website</span><span class="p-check">✓</span>
         </button>
         <button class="platform-item soon" onclick="selectPlatform('Instagram', false)">
           <span class="p-icon" data-icon="instagram"></span><span class="p-name">Instagram</span><span class="soon-badge">Sắp có</span>
@@ -516,7 +521,6 @@
   <nav class="page-tabs" id="pageTabs">
     <button class="tab-item active" data-view="dashboard" onclick="switchView('dashboard')">📊 Dashboard</button>
     <button class="tab-item" data-view="advertising" onclick="switchView('advertising')">📢 Advertising</button>
-    <button class="tab-item" data-view="website" onclick="switchView('website')">🌐 Website</button>
     <button class="tab-item" data-view="metrics" onclick="switchView('metrics')">📖 Explain the metrics</button>
   </nav>
 
@@ -940,7 +944,21 @@ const PLATFORM_ICON_SVG = {
     <rect width="32" height="32" rx="8" fill="#FF0000"></rect>
     <polygon points="13,10 23,16 13,22" fill="#fff"></polygon>
   </svg>`,
+  website: `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <rect width="32" height="32" rx="8" fill="#2563eb"></rect>
+    <circle cx="16" cy="16" r="8.5" fill="none" stroke="#fff" stroke-width="1.8"></circle>
+    <ellipse cx="16" cy="16" rx="3.6" ry="8.5" fill="none" stroke="#fff" stroke-width="1.8"></ellipse>
+    <line x1="7.5" y1="16" x2="24.5" y2="16" stroke="#fff" stroke-width="1.8"></line>
+    <line x1="8.7" y1="11.8" x2="23.3" y2="11.8" stroke="#fff" stroke-width="1.5"></line>
+    <line x1="8.7" y1="20.2" x2="23.3" y2="20.2" stroke="#fff" stroke-width="1.5"></line>
+  </svg>`,
 };
+// Gán (hoặc đổi) icon SVG cho 1 phần tử theo key trong PLATFORM_ICON_SVG — dùng lúc tải trang
+// (qua data-icon) và cả khi đổi nền tảng động (setPlatformIcon) vì lúc đó cần ghi đè lại innerHTML.
+function setPlatformIcon(el, key) {
+  const svg = PLATFORM_ICON_SVG[key];
+  if (el && svg) el.innerHTML = svg;
+}
 document.querySelectorAll('[data-icon]').forEach(el => {
   const svg = PLATFORM_ICON_SVG[el.getAttribute('data-icon')];
   if (svg) el.innerHTML = svg;
@@ -965,7 +983,17 @@ function selectPlatform(name, isConnected) {
   document.getElementById('platformMenu').hidden = true;
   document.getElementById('platformBtn').classList.remove('open');
   if (!isConnected) {
-    setStatus(`${name}: giao diện đã sẵn sàng, chưa kết nối API — sẽ bổ sung ở bản cập nhật sau. Dữ liệu đang xem vẫn là Facebook.`, false);
+    const stayingOn = CURRENT_VIEW === 'website' ? 'Website' : 'Facebook';
+    setStatus(`${name}: giao diện đã sẵn sàng, chưa kết nối API — sẽ bổ sung ở bản cập nhật sau. Dữ liệu đang xem vẫn là ${stayingOn}.`, false);
+    return;
+  }
+  // Facebook và Website là 2 nền tảng riêng — bấm chọn sẽ chuyển hẳn CURRENT_VIEW sang nhóm tương
+  // ứng (chỉ đổi khi thực sự đang ở nhóm kia, tránh việc bấm lại "Facebook" từ tab Advertising lại
+  // bị nhảy về Dashboard).
+  if (name === 'Website' && CURRENT_VIEW !== 'website') {
+    switchView('website');
+  } else if (name === 'Facebook' && CURRENT_VIEW === 'website') {
+    switchView(firstAllowedFacebookView());
   }
 }
 
@@ -1176,10 +1204,25 @@ function renderView() {
   document.getElementById('metricsView').hidden = CURRENT_VIEW !== 'metrics';
   document.getElementById('adminView').hidden = CURRENT_VIEW !== 'admin';
   document.getElementById('toolbar2').style.display = VIEWS_WITH_DATE_FILTER.includes(CURRENT_VIEW) ? '' : 'none';
+  // "Website" giờ là 1 nền tảng riêng (chọn ở góc trên phải), không còn nằm chung hàng tab với
+  // Dashboard/Advertising/Explain the metrics — các tab đó chỉ áp dụng cho Facebook nên ẩn cả
+  // hàng #pageTabs khi đang xem Website, tránh gây hiểu lầm là có thể bấm sang Advertising.
+  document.getElementById('pageTabs').style.display = CURRENT_VIEW === 'website' ? 'none' : '';
   document.querySelectorAll('#pageTabs .tab-item').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.view === CURRENT_VIEW);
   });
   document.getElementById('adminNavBtn').textContent = CURRENT_VIEW === 'admin' ? '← Về Dashboard' : 'Quản lý người dùng';
+  syncPlatformSwitcherUI();
+}
+
+// Đồng bộ giao diện nút chọn nền tảng (góc trên phải) theo CURRENT_VIEW — gọi mỗi khi renderView()
+// chạy nên luôn đúng dù CURRENT_VIEW đổi qua đường nào (bấm menu, đổi quyền, tải trang lần đầu…).
+function syncPlatformSwitcherUI() {
+  const isWebsite = CURRENT_VIEW === 'website';
+  document.getElementById('platformItemFacebook').classList.toggle('active', !isWebsite);
+  document.getElementById('platformItemWebsite').classList.toggle('active', isWebsite);
+  setPlatformIcon(document.getElementById('platformBtnIcon'), isWebsite ? 'website' : 'facebook');
+  document.getElementById('platformBtnName').textContent = isWebsite ? 'WEBSITE' : 'FACEBOOK';
 }
 
 // "Explain the metrics" chỉ là tài liệu tĩnh, không có dữ liệu riêng của Page nào — luôn cho xem.
@@ -1194,12 +1237,21 @@ function firstAllowedView() {
   if (canAccessView('website')) return 'website';
   return 'metrics';
 }
-// Ẩn các tab (Dashboard/Advertising) mà user hiện tại không được cấp quyền xem, và điều hướng
-// khỏi CURRENT_VIEW nếu nó vừa trở thành không hợp lệ (ví dụ Admin vừa thu hẹp quyền của họ).
+// Nền tảng Facebook chỉ gồm Dashboard/Advertising/Explain the metrics (Website đã tách riêng) —
+// dùng khi bấm "Facebook" trong menu chọn nền tảng để quay lại từ Website.
+function firstAllowedFacebookView() {
+  if (canAccessView('dashboard')) return 'dashboard';
+  if (canAccessView('advertising')) return 'advertising';
+  return 'metrics';
+}
+// Ẩn các tab (Dashboard/Advertising) và mục "Website" trong menu chọn nền tảng mà user hiện tại
+// không được cấp quyền xem, và điều hướng khỏi CURRENT_VIEW nếu nó vừa trở thành không hợp lệ
+// (ví dụ Admin vừa thu hẹp quyền của họ).
 function applyViewPermissions() {
   document.querySelectorAll('#pageTabs .tab-item').forEach(btn => {
     btn.hidden = !canAccessView(btn.dataset.view);
   });
+  document.getElementById('platformItemWebsite').hidden = !canAccessView('website');
   if (!canAccessView(CURRENT_VIEW)) {
     switchView(firstAllowedView());
   } else {
