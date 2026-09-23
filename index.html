@@ -2641,7 +2641,7 @@ async function loadWebsiteData(days) {
     if (!res.ok) {
       throw new Error((data && data.error) ? data.error : `Lỗi máy chủ (${res.status})`);
     }
-    renderWebsiteKPIs(data.totals, days);
+    renderWebsiteKPIs(data.totals, data.previousTotals, days);
     renderWebsiteChart(data.daily);
     renderWebsiteTopPages(data.topPages);
     statusEl.hidden = true;
@@ -2653,14 +2653,15 @@ async function loadWebsiteData(days) {
   }
 }
 
-function renderWebsiteKPIs(totals, days) {
+function renderWebsiteKPIs(totals, previousTotals, days) {
+  const prev = previousTotals || {};
   const cards = [
-    { icon: '👥', color: '#2563eb', label: 'Người dùng', value: fmtNum(totals.totalUsers), delta: `<span class="delta flat">Trong ${days} ngày</span>` },
-    { icon: '🔵', color: '#14b8a6', label: 'Phiên truy cập (Sessions)', value: fmtNum(totals.sessions), delta: `<span class="delta flat">Trong ${days} ngày</span>` },
-    { icon: '⚡', color: '#a855f7', label: 'Đang hoạt động', value: fmtNum(totals.activeUsers), delta: `<span class="delta flat">Active users</span>` },
-    { icon: '👁', color: '#f97316', label: 'Lượt xem trang', value: fmtNum(totals.screenPageViews), delta: `<span class="delta flat">Pageviews</span>` },
-    { icon: '⏱', color: '#ec4899', label: 'Thời gian / phiên (TB)', value: fmtDuration((totals.averageSessionDuration || 0) * 1000), delta: `<span class="delta flat">Trung bình</span>` },
-    { icon: '💬', color: '#10b981', label: 'Tỷ lệ tương tác', value: `${((totals.engagementRate || 0) * 100).toFixed(1)}%`, delta: `<span class="delta flat">Engagement rate</span>` },
+    { icon: '👥', color: '#2563eb', label: 'Người dùng', value: fmtNum(totals.totalUsers), delta: deltaHtml(pctDelta(totals.totalUsers, prev.totalUsers)) },
+    { icon: '🔵', color: '#14b8a6', label: 'Phiên truy cập (Sessions)', value: fmtNum(totals.sessions), delta: deltaHtml(pctDelta(totals.sessions, prev.sessions)) },
+    { icon: '⚡', color: '#a855f7', label: 'Đang hoạt động', value: fmtNum(totals.activeUsers), delta: deltaHtml(pctDelta(totals.activeUsers, prev.activeUsers)) },
+    { icon: '👁', color: '#f97316', label: 'Lượt xem trang', value: fmtNum(totals.screenPageViews), delta: deltaHtml(pctDelta(totals.screenPageViews, prev.screenPageViews)) },
+    { icon: '⏱', color: '#ec4899', label: 'Thời gian / phiên (TB)', value: fmtDuration((totals.averageSessionDuration || 0) * 1000), delta: deltaHtml(pctDelta(totals.averageSessionDuration, prev.averageSessionDuration)) },
+    { icon: '💬', color: '#10b981', label: 'Tỷ lệ tương tác', value: `${((totals.engagementRate || 0) * 100).toFixed(1)}%`, delta: deltaHtml(pctDelta(totals.engagementRate, prev.engagementRate)) },
   ];
   document.getElementById('kpiRowWebsite').innerHTML = cards.map(kpiCardHtml).join('');
 }
